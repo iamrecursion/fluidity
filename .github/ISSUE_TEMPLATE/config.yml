@@ -1,0 +1,12 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or Idea
+    url: https://github.com/iamrecursion/fluidity/discussions
+    about: >
+      How do I do X, is this supposed to work like this, or a half-formed idea — Discussions is the
+      right place, and answers there end up helping the next person.
+  - name: Documentation
+    url: https://github.com/iamrecursion/fluidity/tree/main/docs
+    about: >
+      The feature reference, the architecture notes, the roadmap, and the contributing guide. The
+      roadmap in particular lists the known limitations and what causes each of them.

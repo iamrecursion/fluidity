@@ -1,0 +1,89 @@
+name: Nix
+
+# The devshell is the toolchain, so it gets its own checks: that the flake still
+# evaluates, that it is formatted, and — the part that matters most — that the
+# version pinned inside it still agrees with what the rest of the repository
+# expects. That drift is invisible until CI and a contributor format the same
+# file differently, which is a maddening thing to debug from a red check.
+on:
+  push:
+    branches: [main]
+    # Repeated verbatim below: GitHub's workflow parser does not support YAML
+    # anchors, so the two lists have to be kept in step by hand.
+    paths:
+      - flake.nix
+      - flake.lock
+      - .github/workflows/ci.yml
+      - .github/workflows/nix.yml
+  pull_request:
+    paths:
+      - flake.nix
+      - flake.lock
+      - .github/workflows/ci.yml
+      - .github/workflows/nix.yml
+  schedule:
+    # Mondays, 05:00 UTC: nixpkgs moves under a flake that has not changed.
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  flake:
+    name: Flake
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Cache the Nix store
+        uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock', 'flake.nix') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+          gc-max-store-size-linux: 2G
+
+      - name: Check the flake
+        run: nix flake check
+
+      # `nix fmt` runs the flake's own `formatter`, so this checks the file
+      # against the same nixfmt a contributor gets from `nix fmt flake.nix`.
+      - name: Check the formatting
+        run: nix fmt -- --check flake.nix
+
+      # ci.yml's format job installs its own dprint rather than paying for Nix.
+      # That is only honest while the version it installs is the one the
+      # devshell provides — otherwise `make format` and CI disagree about the
+      # same file, and neither of them tells you which one is wrong.
+      - name: Check the dprint pin against the devshell
+        run: |
+          shell_version=$(nix develop --command dprint --version | awk '{ print $2 }')
+          ci_version=$(sed -n 's/^ *dprint-version: "\([0-9.]*\)".*/\1/p' .github/workflows/ci.yml)
+          if [ -z "$ci_version" ]; then
+            echo "::error file=.github/workflows/ci.yml::no pinned dprint-version found"
+            exit 1
+          fi
+          if [ "$shell_version" != "$ci_version" ]; then
+            echo "::error file=.github/workflows/ci.yml::the devshell provides dprint $shell_version but the format job pins $ci_version — update the pin and reformat if it changes anything"
+            exit 1
+          fi
+          echo "the devshell and the format job agree on dprint $shell_version"
+
+      # The devshell is also what the Makefile shells out to, so a Node major
+      # that the plugin cannot actually build under would otherwise surface as a
+      # confusing syntax error inside esbuild. `npm run test:unit` in particular
+      # hands the runner a `**` glob, which needs Node 22 or newer to expand.
+      - name: Check the devshell's Node is new enough
+        run: |
+          major=$(nix develop --command node --print "process.versions.node.split('.')[0]")
+          if [ "$major" -lt 22 ]; then
+            echo "::error file=flake.nix::the devshell provides Node $major; the test runner's '**' glob needs 22 or newer"
+            exit 1
+          fi
+          echo "the devshell provides Node $major"

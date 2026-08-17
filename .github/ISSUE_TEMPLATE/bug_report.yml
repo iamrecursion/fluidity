@@ -1,0 +1,129 @@
+name: Bug report
+description: Fluidity inserted the wrong link, or changed one it should have left alone.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Fluidity works by patching Obsidian's built-in link completer, which
+        is not public API — so the first thing worth checking is the status line at the top of
+        **Settings → Fluidity**, which says whether that patch installed. If it did not, that is the
+        bug, and the console usually says why.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what you got instead.
+      placeholder: |
+        I typed `the ` and then `[[Inter` and picked **Interiority**, and expected
+        `[[Interiority|interiority]]`, but got …
+    validations:
+      required: true
+
+  - type: textarea
+    id: link
+    attributes:
+      label: The link, exactly as it was inserted
+      description: >
+        Copy it out of the note rather than retyping it. The pipe, the `#`, and the capitalisation
+        on both sides of the pipe are the whole question, and they are easy to lose in prose.
+      render: text
+      placeholder: |
+        got:      [[interiority|interiority]]
+        expected: [[Interiority|interiority]]
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: How can we reproduce it?
+      description: >
+        Numbered steps, starting from a fresh note where possible. Include the **frontmatter of the
+        note being linked to** — `fluent`, and `aliases` if the alias you picked is one — and the
+        **exact text of the line** you were typing on, since the words before the link are what
+        decide whether it is a sentence start.
+      placeholder: |
+        1. Create a note `Interiority.md` with the frontmatter `fluent: true`.
+        2. In another note, write the line `A note on the ` and then type `[[Inter`.
+        3. Pick **Interiority** from the popup.
+        4. The line reads … instead of …
+    validations:
+      required: true
+
+  - type: textarea
+    id: versions
+    attributes:
+      label: Versions and platform
+      description: >
+        The Fluidity version from **Settings → Community plugins**, the Obsidian version from
+        **Settings → About**, and your operating system.
+      render: text
+      placeholder: |
+        Fluidity 0.1.0
+        Obsidian 1.13.4 (installer 1.8.10)
+        macOS 15.5
+    validations:
+      required: true
+
+  - type: dropdown
+    id: patch-status
+    attributes:
+      label: What does the status line in Settings → Fluidity say?
+      options:
+        - "The completer patch is installed"
+        - "The completer patch is not installed"
+        - "There is no status line — the settings tab did not open"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: link-format
+    attributes:
+      label: Which link format are you using?
+      description: >
+        **Settings → Files and links → Use [[Wikilinks]]**. Fluidity hands the modified suggestion
+        back to Obsidian's own composer rather than writing the link itself, so both formats should
+        behave — but they take different paths through it.
+      options:
+        - "Wikilinks — [[Note|alias]]"
+        - "Markdown links — [alias](Note.md)"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: other-plugins
+    attributes:
+      label: Does it still happen with other plugins disabled?
+      description: >
+        Fluidity patches the same built-in suggester that several other plugins patch, and they
+        compose in whatever order they happened to load. This narrows it down fast.
+      options:
+        - "Yes — reproduces with only Fluidity enabled"
+        - "No — it goes away when other plugins are disabled"
+        - "Not tried"
+    validations:
+      required: true
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console output
+      description: >
+        Anything relevant from the developer console (Ctrl/Cmd+Shift+I). Fluidity's own messages are
+        prefixed `Fluidity:`, and it logs one line naming itself whenever it declines to install the
+        patch or a transform throws.
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I am on the latest release of Fluidity.
+          required: true
+        - label: I searched the existing issues.
+          required: true

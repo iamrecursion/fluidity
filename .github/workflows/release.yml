@@ -1,50 +1,125 @@
-name: Release Obsidian plugin
+name: Release
 
+# Obsidian finds a plugin release by looking for a git tag identical to
+# manifest.json's `version` — `1.0.0`, never `v1.0.0`. This filter therefore
+# matches bare semver only; `.npmrc` sets `tag-version-prefix=` so that `npm
+# version` produces such a tag, and the first job step re-checks it anyway.
 on:
-    push:
-        tags:
-            - '*'
+  push:
+    tags: ["[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  contents: write # create the release and upload its assets
+  id-token: write # \_ build provenance attestation for the release assets
+  attestations: write # /
 
 jobs:
-    build:
-        runs-on: ubuntu-latest
-        permissions:
-            contents: write
-            id-token: write
-            attestations: write
-        steps:
-            - uses: actions/checkout@v6
+  release:
+    name: Build and draft the release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
 
-            - name: Use Node.js
-              uses: actions/setup-node@v6
-              with:
-                  node-version: 24
-                  cache: 'npm'
+      # Everything a mistagged release breaks is invisible until a user reports
+      # that the plugin will not install, so check every part of the contract
+      # before spending ten minutes on a build. test/unit/release/metadata.test.ts
+      # makes the same assertions against the working tree, which is where you
+      # would rather find out; this is the copy that guards the tag itself.
+      - name: Validate the tag against the manifest
+        run: |
+          tag="$GITHUB_REF_NAME"
+          fail=0
+          note() {
+            echo "::error::$1"
+            fail=1
+          }
 
-            - name: Build plugin
-              run: |
-                  npm ci
-                  npm run build
+          case "$tag" in
+            v*) note "the tag is '$tag'; Obsidian requires a bare version with no 'v' prefix" ;;
+          esac
 
-            - name: Check for optional styles
-              id: styles
-              run: |
-                  [ -f styles.css ] && echo "exists=true" >> "$GITHUB_OUTPUT" || echo "exists=false" >> "$GITHUB_OUTPUT"
+          # node, rather than jq: it is the runtime the rest of this build uses,
+          # and `--eval` is CommonJS regardless of package.json's "type".
+          manifest_version=$(node -p "require('./manifest.json').version")
+          min_app_version=$(node -p "require('./manifest.json').minAppVersion")
+          package_version=$(node -p "require('./package.json').version")
+          versions_entry=$(node -p "require('./versions.json')[process.argv[1]] ?? ''" "$tag")
 
-            - name: Attest build provenance
-              uses: actions/attest@v4
-              with:
-                  subject-path: |
-                      main.js
-                      ${{ steps.styles.outputs.exists == 'true' && 'styles.css' || '' }}
+          [ "$manifest_version" = "$tag" ] \
+            || note "manifest.json says version $manifest_version, but the tag is $tag"
+          [ "$package_version" = "$tag" ] \
+            || note "package.json says version $package_version, but the tag is $tag"
 
-            - name: Create release
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              run: |
-                  tag="${GITHUB_REF#refs/tags/}"
+          if [ -z "$versions_entry" ]; then
+            note "versions.json has no entry for $tag; Obsidian uses it to decide which release an older app should download"
+          elif [ "$versions_entry" != "$min_app_version" ]; then
+            note "versions.json maps $tag to $versions_entry, but manifest.json's minAppVersion is $min_app_version"
+          fi
 
-                  gh release create "$tag" \
-                    --title="$tag" \
-                    --draft \
-                    main.js manifest.json ${{ steps.styles.outputs.exists == 'true' && 'styles.css' || '' }}
+          [ "$fail" -eq 0 ] || exit 1
+          echo "$tag — minAppVersion $min_app_version"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      # Restore only. A tag push can read caches from the default branch, so CI
+      # has already warmed these; a release should not evict anything.
+      - name: Restore the Nix store cache
+        uses: nix-community/cache-nix-action/restore@v7
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock', 'flake.nix') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Check
+        run: make check
+
+      - name: Bundle
+        run: make build
+
+      # All three assets, not just the bundle: attestation proves an asset came
+      # from this repository's workflow, and an unattested one is exactly where a
+      # substitution would go unnoticed. styles.css is loaded into every note's
+      # DOM and manifest.json decides what Obsidian trusts the plugin to be, so
+      # neither is inert — least of all for a plugin that patches the editor.
+      - name: Attest the build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            main.js
+            manifest.json
+            styles.css
+
+      # Obsidian downloads main.js, manifest.json and styles.css as individual
+      # release assets; it does not look inside the source archive GitHub
+      # attaches automatically. Draft, so the release is reviewed before it
+      # exists as far as Obsidian is concerned — only published releases are
+      # visible to it.
+      - name: Draft the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --draft \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            main.js manifest.json styles.css
+
+      # Obsidian's review builds the tagged source with `npm ci && npm run build`
+      # and compares the result against the released main.js, so the assets must
+      # not be rebuilt or replaced by hand afterwards: that breaks the match and
+      # drops the attestation at once. Different bytes need a new version.
+      - name: Summarize
+        run: |
+          {
+            echo "### $GITHUB_REF_NAME drafted"
+            echo
+            echo "\`main.js\` is $(stat -c%s main.js) bytes."
+            echo
+            echo "Review the draft and publish it — Obsidian only sees published releases."
+          } >> "$GITHUB_STEP_SUMMARY"

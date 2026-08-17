@@ -1,19 +1,41 @@
 {
-	"compilerOptions": {
-		"inlineSourceMap": true,
-		"inlineSources": true,
-		"module": "ESNext",
-		"target": "ES2021",
-		"strict": true,
-		"noImplicitReturns": true,
-		"noFallthroughCasesInSwitch": true,
-		"noUncheckedIndexedAccess": true,
-		"moduleResolution": "node",
-		"isolatedModules": true,
-		"skipLibCheck": true,
-		"forceConsistentCasingInFileNames": true,
-		"allowSyntheticDefaultImports": true,
-		"lib": ["ES2021", "DOM"]
-	},
-	"include": ["src/**/*.ts"]
+  "compilerOptions": {
+    "baseUrl": ".",
+    "inlineSourceMap": true,
+    "inlineSources": true,
+    "module": "ESNext",
+    "target": "ES2021",
+    "allowJs": true,
+    "noImplicitAny": true,
+    "moduleResolution": "node",
+    "importHelpers": true,
+    "isolatedModules": true,
+    "strict": true,
+    "strictNullChecks": true,
+    // Not implied by `strict`, and the gap is a real one: tsc is the only checker here that sees a
+    // write-only private field. ESLint's no-unused-vars does not inspect class properties, and an
+    // editor reports it only as a suggestion — so without this, `make check` would not.
+    "noUnusedLocals": true,
+    // ES2022 rather than ES2021 to match `target`. `lib` describes what built-ins the runtime is
+    // assumed to have, and Obsidian's Electron has all of ES2022; leaving it at ES2021 means the
+    // checker only tolerates a newer built-in because `@types/node` drags newer lib declarations in
+    // transitively — which makes the build depend on a dev dependency to describe the *runtime*, and
+    // a checker that resolves types even slightly differently then sees every use of one as unsafe.
+    // That is exactly what Obsidian's plugin review reported against a sibling plugin. `target`
+    // stays ES2021: this widens what built-ins we may assume, not what syntax we emit.
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+    // esbuild produces the bundle and node:test runs the sources through tsx, so
+    // tsc is only ever a checker here.
+    "noEmit": true,
+    // The test suite imports with explicit `.ts` extensions, which is what lets
+    // node run it under tsx without a build step. src/ uses extensionless
+    // specifiers, since esbuild resolves those.
+    "allowImportingTsExtensions": true,
+    // `import assert from "node:assert/strict"` is how node documents it, and
+    // both node and esbuild resolve it. This tells the checker so, without
+    // `esModuleInterop`'s effect on how imports are emitted.
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
 }

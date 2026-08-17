@@ -1,8 +1,7 @@
-/*
-
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
-
-If your plugin does not need CSS, delete this file.
-
-*/
+/* Fluidity plugin styles.
+ *
+ * Deliberately near-empty. Fluidity has no views and no widgets — it changes what the built-in
+ * link completer inserts, and every pixel it touches is Obsidian's own. The file exists because
+ * `styles.css` is one of the three files Obsidian installs alongside a plugin, so shipping it
+ * keeps `make install` and the release workflow uniform with every other plugin.
+ */

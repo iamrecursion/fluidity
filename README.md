@@ -1,92 +1,75 @@
-# Obsidian Sample Plugin
+# Fluidity
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+Fluidity is a plugin for [Obsidian](https://obsidian.md) that finishes the links the link completer
+starts while giving you control over exactly how itt's done!
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+Obsidian's autocomplete is usually very good at working out _which note you meant_, and then hands
+you a link that is _nearly_ right. The display text might be capitalized when the sentence wanted it
+lowercase, or the linked pointing at the top of a note when you meant it to point at a section
+half-way down. Both leave you editing a link that could have just been right the first time.
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
+Fluidity changes what gets inserted, at the moment it gets inserted, so there is nothing to go back
+and fix. It lets you tailor linking and aliases, as well as casing for sentence-form insertion, on a
+per-note basis, and makes the completer truly work for you!
 
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open modal (simple)" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and outputs a Notice on click.
-- Registers a global interval which logs 'setInterval' to the console.
-
-## First time developing plugins?
-
-Quick starting guide for new plugin devs:
-
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `src/main.ts` to `main.js`.
-- Make changes to `src/main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
-
-## Releasing new releases
-
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
-
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
-
-## Adding your plugin to the community plugin list
-
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
-
-## How to use
-
-- Clone this repo.
-- Make sure your NodeJS is at least v18 (`node --version`).
-- `npm i` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
-
-## Manually installing the plugin
-
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
-
-## Improve code quality with eslint
-
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code.
-- This project already has eslint preconfigured, you can invoke a check by running`npm run lint`
-- Together with a custom eslint [plugin](https://github.com/obsidianmd/eslint-plugin) for Obsidan specific code guidelines.
-- A GitHub action is preconfigured to automatically lint every commit on all branches.
-
-## Funding URL
-
-You can include funding URLs where people who use your plugin can financially support it.
-
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
-
-```json
-{
-	"fundingUrl": "https://buymeacoffee.com"
-}
+```text
+A note on the [[Interiority|interiority]] of the thing.
+                            ^ Fluidity added this, because the sentence did not start here
 ```
 
-If you have multiple URLs, you can also do:
+> **Fluidity is not released yet.** It is in active development, and the community-plugin listing
+> below does not exist. Until it does, [BRAT](https://github.com/TfTHacker/obsidian42-brat) or a
+> manual install from a release is the way in.
 
-```json
-{
-	"fundingUrl": {
-		"Buy Me a Coffee": "https://buymeacoffee.com",
-		"GitHub Sponsor": "https://github.com/sponsors",
-		"Patreon": "https://www.patreon.com/"
-	}
-}
-```
+## Key Features
 
-## API Documentation
+TBC
 
-See https://docs.obsidian.md
+## Installation
+
+Fluidity is not yet listed in the Community Plugins directory. Until it is:
+
+1. Download `main.js`, `manifest.json`, and `styles.css` from the
+   [latest release](https://github.com/iamrecursion/fluidity/releases/latest).
+2. Create `<vault>/.obsidian/plugins/fluidity/` and put all three files in it.
+3. Reload Obsidian, then enable **Fluidity** under **Settings → Community plugins**.
+
+[BRAT](https://github.com/TfTHacker/obsidian42-brat) will do the same thing and keep it updated.
+
+> **Fluidity requires Obsidian 1.13.0 or newer.**
+
+## Basic Usage
+
+TBC
+
+## A Note on How This Works
+
+Obsidian's link completer is not exposed, so Fluidity achieves what it does by being a bit naughty
+and **patching it**. It finds the built-in suggester at runtime, wraps the method that turns your
+choice into text, and then adjusts the choice before handing it to Obsidian's code to insert. The
+insertion itself is never reimplemented, which is why the result respects your link-format settings
+and why undo puts the note back in a single step.
+
+The cost of doing it this way is simply that an Obsidian update can trivially break the plugin.
+Fluidity is designed to fail gracefully when this happens, not installing the patch and reporting
+the failure in its settings tab. The [architecture doc](./docs/architecture.md) lays out exactly
+what assumptions this plugin makes and what happens when they stop holding.
+
+## Documentation
+
+If you are interested in contributing to Fluidity, or simply building it yourself, please read the
+[contributing guide](docs/CONTRIBUTING.md).
+
+- The [feature reference](docs/features.md) explains every behavior and the settings that govern it,
+  including exactly what counts as a sentence start.
+- The [architecture doc](docs/architecture.md) lays out the modules, the pure layer, and everything
+  the plugin assumes about Obsidian's internals.
+- The [roadmap](docs/roadmap.md) provides an overview of what is planned, what is not, and the known
+  limitations.
+
+## Credits
+
+Fluidity leans on [`monkey-around`](https://github.com/pjeby/monkey-around) by PJ Eby, the Obsidian
+ecosystem's standard way to wrap a method and be able to unwrap it again. It is ISC-licensed.
+
+This plugin is [MIT-licensed](./LICENSE).
