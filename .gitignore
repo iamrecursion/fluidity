@@ -12,8 +12,10 @@ npm-debug.log*
 /result
 /result-*
 
-# Obsidian plugin data, present when the repository is symlinked into a vault
-# for testing.
+# Obsidian plugin data. `make link` links the plugin's files individually, so a
+# vault writes its settings beside them rather than here; this covers a vault
+# whose whole plugin folder is a symlink to the checkout, which `make unlink`
+# copies across.
 /data.json
 
 # The local development runbook: session state and working notes, not user
@@ -25,3 +27,6 @@ npm-debug.log*
 *.swp
 /.idea/
 /.vscode/
+
+# The local-only plan directory
+tmp/

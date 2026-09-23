@@ -19,7 +19,7 @@ single sentence answers most questions about scope:
   the same in any other Markdown editor.
 - It does not run on typing, on paste, or on save.
 - It never rewrites text after Obsidian has inserted it. The link Obsidian writes is already the
-  right one, which is why **undo is a single step**.
+  right one, so **undoing it costs exactly what undoing any completion costs**.
 
 ## Fluent Note Titles
 
@@ -102,6 +102,10 @@ popup therefore keeps showing your notes with their real, properly capitalised t
 makes them readable in a list.
 
 ### Other Completions are Untouched
+
+**Embeds are left alone.** `![[Interiority]]` renders the note rather than reading as prose, and
+what follows the pipe in one is a display argument rather than text. An embed is inserted exactly as
+Obsidian would insert it, whether or not the note is fluent.
 
 Typing `#` for a heading, `^` for a block reference, or `|` for an alias inside a link behaves
 exactly as it does without the plugin. So does `Shift+Enter`, and so does every suggestion type
@@ -206,6 +210,10 @@ See the [roadmap](./roadmap.md).
 
 ## Settings
 
+**Not implemented yet.** There is no settings tab. The property is fixed as `fluent` in
+`src/main.ts`, there is no master toggle, and changing either takes an edit and a rebuild. What this
+section describes is the intended shape, and the [roadmap](./roadmap.md) tracks it.
+
 **Settings → Fluidity**.
 
 | Setting             | Default  | What it does                                                   |
@@ -222,3 +230,6 @@ the first thing to check when nothing seems to be happening: Fluidity works by p
 Obsidian that is not public API, and an Obsidian update is capable of moving what it attaches to. If
 that happens the plugin declines to install the patch, says so here and once in the developer
 console, and leaves the completer behaving exactly as it does without the plugin.
+
+Until that line exists, the developer console is the only place the failure is reported, which is
+why checking the plugin by hand starts by opening it.
