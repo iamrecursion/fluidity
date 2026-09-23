@@ -48,7 +48,7 @@ Obsidian's link completer is not exposed, so Fluidity achieves what it does by b
 and **patching it**. It finds the built-in suggester at runtime, wraps the method that turns your
 choice into text, and then adjusts the choice before handing it to Obsidian's code to insert. The
 insertion itself is never reimplemented, which is why the result respects your link-format settings
-and why undo puts the note back in a single step.
+and why undoing a link costs no more than undoing any other completion.
 
 The cost of doing it this way is simply that an Obsidian update can trivially break the plugin.
 Fluidity is designed to fail gracefully when this happens, not installing the patch and reporting

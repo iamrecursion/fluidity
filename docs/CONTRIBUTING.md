@@ -21,7 +21,7 @@ project's toolchain. CI runs inside the same shell, executing the same `make` ta
 git clone https://github.com/iamrecursion/fluidity.git
 cd fluidity
 nix develop        # or: make shell
-make deps          # npm ci
+make deps          # npm ci, plus the esbuild binary for every platform sharing the checkout
 make build         # type-check and bundle main.js
 make check         # exactly what CI runs
 ```
@@ -31,17 +31,17 @@ shell, so `make check` works from a bare terminal too while being a little slowe
 
 `make help` lists every target, but the main ones you will use are these:
 
-| Target           | What it does                                                    |
-| ---------------- | --------------------------------------------------------------- |
-| `make build`     | typecheck + bundle — a release `main.js`                        |
-| `make dev`       | rebuild `main.js` on change, with sourcemaps                    |
-| `make install`   | build, then copy the plugin into `$DEV_VAULT_PATH`              |
-| `make link`      | symlink this checkout into `$DEV_VAULT_PATH` instead of copying |
-| `make unlink`    | swap that symlink back for a copied build                       |
-| `make check`     | **everything CI checks**: format, typecheck, lint, all tests    |
-| `make test-unit` | the pure tests only — fast                                      |
-| `make format`    | reformat Markdown, JSON, CSS and TypeScript with dprint         |
-| `make clean`     | drop build output, keep `node_modules`                          |
+| Target           | What it does                                                            |
+| ---------------- | ----------------------------------------------------------------------- |
+| `make build`     | typecheck + bundle — a release `main.js`                                |
+| `make dev`       | rebuild `main.js` on change, with sourcemaps                            |
+| `make install`   | build, then copy the plugin into `$DEV_VAULT_PATH`                      |
+| `make link`      | symlink this checkout's files into `$DEV_VAULT_PATH` instead of copying |
+| `make unlink`    | swap those symlinks back for a copied build                             |
+| `make check`     | **everything CI checks**: format, typecheck, lint, all tests            |
+| `make test-unit` | the pure tests only — fast                                              |
+| `make format`    | reformat Markdown, JSON, CSS and TypeScript with dprint                 |
+| `make clean`     | drop build output, keep `node_modules`                                  |
 
 Building without Nix is possible as the toolchain is only Node, and `npm ci && npm run build` is
 exactly what Obsidian's plugin review runs, so CI checks that path on every push. You will want
@@ -68,9 +68,10 @@ looks for. The target refuses a path with no `.obsidian` directory in it, and ch
 building rather than after. Obsidian does not notice the new files on its own, so you will need to
 reload the app (or toggle the plugin off and back on).
 
-For rapid development, `make link` symlinks the repository into `<vault>/.obsidian/plugins/` instead
-of copying into it. Obsidian follows the symlink, so a rebuild is live in the vault with no second
-step, which pairs well with leaving `make dev` running.
+For rapid development, `make link` fills `<vault>/.obsidian/plugins/<id>/` with symlinks to this
+checkout's `main.js`, `manifest.json` and `styles.css` instead of copying them. Obsidian follows
+each one, so a rebuild is live in the vault with no second step, which pairs well with leaving
+`make dev` running.
 
 ```sh
 export DEV_VAULT_PATH=~/vaults/dev
@@ -78,24 +79,34 @@ make link
 ```
 
 It takes the same two guards as `make install` and deliberately does not build, since the intent is
-that you link once and leave `make dev` running — so a fresh checkout has no `main.js` yet, and the
-target says so rather than leaving you with a plugin Obsidian cannot load. It never removes what is
-already at the destination: if `make install` has put a real folder there, `make link` tells you to
-delete it yourself, because that folder may hold your `data.json`. Once linked, the settings
-Obsidian writes land in the checkout itself, which the `.gitignore` already accounts for. Reloading
-is still on you as Obsidian does not watch the file for changes.
+that you link once and leave `make dev` running — so a fresh checkout has no `main.js` yet, its link
+dangles, and the target says so rather than leaving you with a plugin Obsidian cannot load. It never
+removes what is already at the destination: if `make install` has put a copied folder there,
+`make link` tells you to delete it yourself, because that folder may hold your `data.json`. Settings
+Obsidian writes land in the vault folder beside the links. Reloading is still on you, as Obsidian
+does not watch the files for changes.
 
-`make unlink` is the way back. It builds, removes the symlink, and copies the same three files in
-its place, leaving the vault with an ordinary install:
+The plugin folder is a real directory and only its contents are links, which is what makes it safe
+to remove. `rm` deletes a symlink rather than following it, so clearing the folder out costs three
+links that `make link` rebuilds in a second. A folder that is _itself_ one symlink does not have
+that property: `rm -rf <folder>/`, carrying the trailing slash that shell completion appends for
+you, deletes the contents of the checkout it points at, silently and with nothing reported.
+
+`make unlink` is the way back. It replaces the links with the files they point at, leaving the vault
+with an ordinary install:
 
 ```sh
 export DEV_VAULT_PATH=~/vaults/dev
 make unlink
 ```
 
-The build happens **before** the symlink goes, so a build that fails leaves the vault with the
-plugin it already had rather than an empty folder. The checkout's `data.json` is copied across if
-there is one, since that is where the linked plugin has been keeping its settings.
+Its job is to get a vault off a checkout, so a build it cannot run does not stop it: with a
+`main.js` already in the checkout it installs that one and says so, and only a destination with
+nothing to copy at all is an error. That matters on a machine which only runs Obsidian, where the
+toolchain may not work and where failing would leave a hand-written `rm` as the only way out.
+
+A folder that is itself a symlink to a whole checkout is converted too, and that checkout's
+`data.json` is copied across, since that is where a plugin linked that way keeps its settings.
 
 ### What to Check by Hand
 
@@ -106,8 +117,11 @@ Any change to what gets inserted should be exercised against at least this much:
 2. A **multi-word** fluent title, and one of its **aliases**.
 3. A note with no `fluent` property, and one with `fluent: false`, which should both be completely
    untouched.
-4. **Undo**, which must put the note back in one step. If it takes two, the plugin is rewriting text
-   after insertion somewhere, and that is a bug regardless of what the undo produces.
+4. **Undo**, which must cost exactly as many steps as it does with the plugin disabled. Accepting
+   any completion takes two in stock Obsidian, one for the completion and one for the typing, so
+   count both ways rather than expecting one. A fluent insertion costing more than a control does
+   means the plugin is rewriting text after insertion, and that is a bug regardless of what the undo
+   produces.
 5. Selection by **mouse click**, by **Enter**, and by **Tab**.
 6. `#`, `^` and `|` completions, which must behave exactly as they do without the plugin.
 7. **Use `[[Wikilinks]]` turned off**, where the same choice must produce a well-formed Markdown
@@ -183,7 +197,8 @@ pull request that breaks one of them will be sent back:
 - **Read what you need before delegating** as the original clears the state you want to read in its
   first statement.
 - **Never reimplement the insertion.** Adjust the suggestion and hand it back. That is what makes
-  the result honor link-format settings, and what makes undo a single step.
+  the result honor link-format settings, and what keeps the insertion one editor transaction, so
+  undo costs no more than it does without the plugin.
 - **Pass through what you do not handle**, untouched and by identity. Some suggestion types write to
   files when selected, and intercepting one of those is how a plugin corrupts a note.
 - **Fail quietly** if the patch cannot be installed, log one line naming the plugin, disable the

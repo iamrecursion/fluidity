@@ -137,6 +137,11 @@ how it does so is a deliberate response to something that will otherwise go wron
 `suggests: EditorSuggest[]`. Dispatch is **first non-null `onTrigger` wins, in array order**, which
 is how one plugin's suggester displaces another's.
 
+Because that singleton is built with the workspace, the registry is already populated by the time a
+plugin's `onload` runs, which is why the patch is not deferred to `onLayoutReady`. Enabling a plugin
+by hand happens long after startup, so a patch that needed the later hook would work every time it
+was switched on and be dead on every cold start.
+
 The built-in link suggester is `suggests[0]` at startup, but it **must be located by capability**:
 
 ```ts
@@ -177,8 +182,12 @@ control is handed to the original:
 const ctx = this.context; // before old(), never after
 ```
 
-This is the kind of thing that works perfectly in every test written against a fake and fails on the
-first real keystroke.
+This is the kind of thing that works perfectly against a fake whose `selectSuggestion` leaves the
+context alone, and fails on the first real keystroke. The fake in
+`test/integration/suggest/patch.test.ts` clears it, exactly as `close()` does: a wrapper that reads
+the context anywhere but off the instance being called — when the patch is installed, say — then
+sees the cleared value, stops adjusting anything. That file pins the rest of the rules in this
+section the same way, each against a registry shaped like the real one.
 
 ### Only Some Suggestion Types May be Touched
 
@@ -208,8 +217,8 @@ silently write the wrong link — which is worth stating plainly, because "use t
 otherwise the obviously correct advice.
 
 Going through the built-in composer also inherits correct handling of both **Use [[Wikilinks]]** and
-**New link format** for free, and keeps the insertion a single editor transaction, which is what
-makes undo one step.
+**New link format** for free, and keeps the insertion a single editor transaction, so undoing it
+costs exactly what undoing any completion costs.
 
 ### A Fluent Note With no Alias Becomes an Alias Item
 
