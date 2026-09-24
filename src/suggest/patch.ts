@@ -1,7 +1,8 @@
 /**
  * Finding Obsidian's link completer and wrapping the method that inserts a choice.
  *
- * This is the only module that touches Obsidian's internals, and it is deliberately the smallest
+ * This is the only module that touches Obsidian's internals, and it is deliberately as small as
+ * possible
  * one that can be: it locates an object the app never exposes, wraps a single method, captures the
  * one piece of state that method destroys, and delegates. It makes no decisions — `suggest/item`
  * says what may be touched and `suggest/transform` says what it becomes.
@@ -55,10 +56,16 @@ export type PatchResult =
 /**
  * Wrap the completer's `selectSuggestion` so that a fluent note's link reads as prose.
  *
- * The returned uninstaller belongs in `plugin.register()`, so that disabling Fluidity puts the
- * completer back exactly as it was.
+ * The returned uninstaller is the caller's to hold onto. Fluidity's plugin calls it on unload, and
+ * again whenever the master toggle is switched off, so that either one puts the completer back
+ * exactly as it was.
+ *
+ * `options` is a function rather than a record because the settings tab can change the property
+ * name between one completion and the next, and reading it per call is what makes that take effect
+ * immediately. Reinstalling on each change would do the same job while moving Fluidity's wrapper
+ * to the outside of every other plugin's.
  */
-export function installFluentTitles(app: App, options: TransformOptions): PatchResult {
+export function installFluentTitles(app: App, options: () => TransformOptions): PatchResult {
   try {
     const builtin = findLinkSuggest(app);
     if (builtin === null) {
@@ -88,7 +95,7 @@ export function installFluentTitles(app: App, options: TransformOptions): PatchR
 
           let chosen = item;
           try {
-            chosen = transformSuggestion(app, item, context, options);
+            chosen = transformSuggestion(app, item, context, options());
           } catch (error) {
             // A failure to adjust is not a reason to swallow the user's keystroke: fall through
             // with what Obsidian handed us, which inserts exactly what it would have without the

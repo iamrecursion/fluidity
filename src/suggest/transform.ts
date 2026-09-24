@@ -21,7 +21,9 @@ import { isFluent } from "../fluent/frontmatter";
 import { startsSentence } from "../prose/sentence";
 import { isAliasSuggestion, isFileSuggestion, type LinkSuggestion } from "./item";
 
-/** What the rule needs to know from the user, pending the settings tab. */
+/**
+ * What the rule needs to know from the user.
+ */
 export interface TransformOptions {
   /** The frontmatter property that marks a note fluent. */
   property: string;

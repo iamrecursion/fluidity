@@ -1,7 +1,49 @@
 /* Fluidity plugin styles.
  *
- * Deliberately near-empty. Fluidity has no views and no widgets — it changes what the built-in
- * link completer inserts, and every pixel it touches is Obsidian's own. The file exists because
- * `styles.css` is one of the three files Obsidian installs alongside a plugin, so shipping it
- * keeps `make install` and the release workflow uniform with every other plugin.
+ * Deliberately near-empty. Fluidity has no views of its own: it changes what the built-in link
+ * completer inserts, and its settings tab is assembled from Obsidian's own components, so nearly
+ * every pixel it touches is styled by the app and by whatever theme is in use. The rules below
+ * exist because one line of that tab has no native styling to inherit.
+ *
+ * The file would ship even with nothing in it — `styles.css` is one of the three files Obsidian
+ * installs alongside a plugin, and shipping it keeps `make install` and the release workflow
+ * uniform with every other plugin.
  */
+
+/* The settings tab's status line.
+ *
+ * Obsidian has no variant of `Setting` that reads as a state, so the one word that answers "is this
+ * running?" is marked here: a green check for active, a red crossed octagon for not. A failure
+ * reported in the same grey as every other description is one nobody notices, which would defeat
+ * the point of reporting it outside the developer console at all.
+ *
+ * Only the word and its icon are colored. The sentence after them explains which kind of inactive
+ * this is, and it stays ordinary description text, because a whole line of red is harder to read
+ * rather than easier to notice.
+ */
+.fluidity-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-2-1);
+  font-weight: var(--font-semibold);
+}
+
+.fluidity-status.mod-active {
+  color: var(--text-success);
+}
+
+.fluidity-status.mod-inactive {
+  color: var(--text-error);
+}
+
+/* The icon takes its color from the word beside it, as every Lucide icon is drawn in
+ * `currentColor`. It is sized in `em` rather than from Obsidian's icon scale so that it matches
+ * whatever size a theme gives description text, instead of towering over a small one. */
+.fluidity-status-icon {
+  display: inline-flex;
+}
+
+.fluidity-status-icon .svg-icon {
+  width: 1em;
+  height: 1em;
+}

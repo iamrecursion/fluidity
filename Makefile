@@ -195,34 +195,60 @@ install: ## Build and install into the vault at $DEV_VAULT_PATH
 # for you — deletes the contents of what it points at, silently, reporting nothing.
 #
 # It deliberately does not build: you link once and leave `make dev` running, so a fresh checkout
-# has no main.js yet and its link dangles until the first build, hence the reminder. An existing
-# real directory is never removed here — it is somebody's install, and possibly their settings —
-# and deleting one to save a `rm` is not a trade this target gets to make.
+# has no main.js yet and its link dangles until the first build, hence the reminder.
+#
+# `FORCE=1` takes over a destination this would otherwise refuse: a copied install, a whole-folder
+# symlink, or links following a different checkout. It stays opt-in because those files are
+# somebody's, and it is safe because of what it will not do. No directory is ever removed: a copied
+# install loses the plugin's three files by name, which this checkout rebuilds in a second, and a
+# whole-folder symlink loses the link itself, never what it points at. `data.json` is the one thing
+# in that folder nobody can regenerate, so it is left where it lies — or carried across when the
+# folder *was* the link and the settings are therefore sitting in the checkout. A destination that
+# is not a plugin directory is refused either way: force is permission to replace this plugin's
+# files, not a licence to guess at somebody else's.
 .PHONY: link
-link: ## Symlink this checkout's files into the vault at $DEV_VAULT_PATH (pairs with make dev)
+link: ## Symlink this checkout's files into the vault at $DEV_VAULT_PATH (FORCE=1 to take one over)
 	$(vault-guard)
 	@$(vault-dest); \
 	here=$$(pwd -P); \
 	case $$($(dest-shape)) in \
 	copied) \
-	  echo "make link: '$$dest' holds an installed copy of the plugin, and possibly its data.json." >&2; \
-	  echo "  Remove it yourself once you are sure, then re-run: rm -r '$$dest'" >&2; \
-	  exit 1; \
+	  if [ -z "$(FORCE)" ]; then \
+	    echo "make link: '$$dest' holds an installed copy of the plugin, and possibly its data.json." >&2; \
+	    echo "  'FORCE=1 make link' replaces the plugin's files with links and leaves data.json alone." >&2; \
+	    echo "  Or remove it yourself once you are sure, then re-run: rm -r '$$dest'" >&2; \
+	    exit 1; \
+	  fi; \
+	  for f in $(PLUGIN_FILES); do rm -f "$$dest/$$f"; done; \
+	  echo "Took over the copied install in $$dest; anything else there, data.json included, is untouched."; \
 	  ;; \
 	whole-link) \
-	  echo "make link: '$$dest' is a symlink to a whole checkout, which this target no longer makes." >&2; \
-	  echo "  'make unlink' replaces it safely, or remove it with no trailing slash: rm '$$dest'" >&2; \
-	  echo "  'rm -r $$dest/' would instead delete the contents of the checkout it points at." >&2; \
-	  exit 1; \
+	  if [ -z "$(FORCE)" ]; then \
+	    echo "make link: '$$dest' is a symlink to a whole checkout, which this target no longer makes." >&2; \
+	    echo "  'FORCE=1 make link' replaces it with a folder of links, carrying data.json across." >&2; \
+	    echo "  'make unlink' replaces it with a copied build, or remove it with no trailing slash: rm '$$dest'" >&2; \
+	    echo "  'rm -r $$dest/' would instead delete the contents of the checkout it points at." >&2; \
+	    exit 1; \
+	  fi; \
+	  was=$$($(dest-target)); \
+	  rm "$$dest"; \
+	  mkdir -p "$$dest"; \
+	  if [ -n "$$was" ] && [ -f "$$was/data.json" ]; then \
+	    cp "$$was/data.json" "$$dest/" || exit 1; \
+	    echo "Carried data.json across from $$was, so the plugin keeps the settings it had while linked."; \
+	  fi; \
+	  echo "Replaced the whole-folder symlink at $$dest; $${was:-what it pointed at} is untouched."; \
 	  ;; \
 	other) \
 	  echo "make link: '$$dest' exists and is not a plugin directory." >&2; \
+	  echo "  FORCE=1 does not reach this: it replaces this plugin's files, and will not guess at others'." >&2; \
 	  exit 1; \
 	  ;; \
 	esac; \
 	target=$$($(dest-target)); \
-	if [ -n "$$target" ] && [ "$$target" != "$$here" ]; then \
+	if [ -n "$$target" ] && [ "$$target" != "$$here" ] && [ -z "$(FORCE)" ]; then \
 	  echo "make link: '$$dest' links to '$$target', not this checkout." >&2; \
+	  echo "  'FORCE=1 make link' re-points them here, deleting nothing: a symlink is replaced, not followed." >&2; \
 	  echo "  Its contents are symlinks, so removing it reaches no checkout: rm -r '$$dest'" >&2; \
 	  exit 1; \
 	fi; \

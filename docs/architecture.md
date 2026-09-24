@@ -54,14 +54,14 @@ settings tab. It makes no decisions of its own, which is what lets everything be
 without it.
 
 ```
-src/main.ts                 lifecycle only — load settings, install the patch, add the settings tab
-src/settings/defs.ts        settings interface, defaults, normalization (pure)
-src/settings/tab.ts         the settings tab
+src/main.ts                 lifecycle only — load settings, add the tab, install/remove the patch
+src/settings/defs.ts        settings record, defaults, normalization of what was stored (pure)
+src/settings/tab.ts         the settings tab, declared for Obsidian 1.13 to render
 src/suggest/patch.ts        locate + patch the built-in suggester (the only internals-touching file)
 src/suggest/item.ts         the suggestion-item union and its type guards
-src/suggest/transform.ts    (item, context, settings) → item : the decision, thin and delegating
+src/suggest/transform.ts    (item, context, options) → item : the decision, thin and delegating
 src/fluent/frontmatter.ts   read fluency from a frontmatter-shaped object (pure)
-src/fluent/display.ts       (displayText, isFluent, atSentenceStart) → display text (pure)
+src/fluent/display.ts       (displayText, atSentenceStart) → display text (pure)
 src/prose/sentence.ts       is this offset a sentence start? (pure)
 ```
 
@@ -160,8 +160,9 @@ Obsidian's startup is one nobody can uninstall from inside Obsidian.
 ### Patching the Instance's Own Prototype
 
 The patch goes on `builtin.constructor.prototype`, via
-[`monkey-around`](https://github.com/pjeby/monkey-around), and the uninstaller it returns is handed
-to `plugin.register()` so that disabling the plugin puts everything back.
+[`monkey-around`](https://github.com/pjeby/monkey-around), and the uninstaller it returns is called
+from `onunload`, so that disabling the plugin puts everything back — and from the master toggle, so
+that switching the feature off does too.
 
 It must not go on `EditorSuggest.prototype`. That is shared with the tag suggester, the footnote
 suggester, and every suggester every other plugin has registered — patching it would have Fluidity
@@ -276,6 +277,53 @@ the metadata cache, and the same tag is used by the mobile toolbar's `[[` button
 production-grade, it depends on nothing undocumented, and knowing it exists is what makes the
 current approach a considered choice rather than the only one anybody thought of. The
 [roadmap](./roadmap.md) tracks it.
+
+## Settings
+
+Two settings, one read-only status line, and three decisions worth writing down.
+
+### The Master Toggle Removes the Patch
+
+Turning fluent titles off uninstalls the wrapper rather than making it inert. Both would leave
+completions unchanged, so the difference only matters for the reason somebody reaches for the
+switch: Fluidity's risk is that it patches a part of Obsidian that is not meant to be
+user-accessible, and an off switch that leaves the patch in place does not retire that risk. Off
+means the app is running the code it would run without Fluidity installed.
+
+`main.ts` owns this. It keeps the current `PatchResult` and reconciles it against the setting;
+`suggest/transform` is deliberately given a narrower record than `settings/defs` holds, so that the
+decision cannot start answering a question that belongs to the lifecycle.
+
+One consequence is free: toggling off and back on reinstalls, which is the easy retry for a failed
+install. Retrying on every settings change instead would relog the same failure on every keystroke.
+
+### The Property is Read Per Completion
+
+`installFluentTitles` takes a **function** returning its options rather than a record, and calls it
+inside the wrapper. That is what lets a rename take effect on the next completion.
+
+### `data.json` is Not Trusted
+
+Obsidian hands back whatever `JSON.parse` made of a file the user can open and edit, and which may
+have been written by an older version of this plugin. The conventional
+`Object.assign({}, DEFAULTS, await loadData())` accepts all of it: a `fluentProperty` of `null`
+survives and is then used to read frontmatter under the key `"null"`, and a `fluentTitles` of
+`"false"` is a truthy string that turns the feature on for somebody whose file says it is off.
+
+A file that can be edited can also stop being JSON, and that is a separate failure: it happens
+before any of this, in `loadData`. `main.ts` catches it, reports one line and starts on the
+defaults, because `onload` is the one method here that must not fail: a plugin that breaks
+Obsidian's startup is one nobody can disable from inside Obsidian.
+
+Reading a file makes `onload` asynchronous, and Obsidian is free to unload a plugin while an `await`
+inside one is still pending. That is why `main.ts` checks whether it has been unloaded before it
+installs anything: a patch applied after the unload that would have removed it stays on the
+completer until the app restarts, with nothing left running that knows it is there.
+
+So `settings/defs` **rebuilds** the record field by field instead of merging, and each field that
+does not hold its declared type falls back to its own default. Field by field rather than wholesale,
+because the two settings are independent and one unusable value should not silently revert the
+other.
 
 ## The Build
 

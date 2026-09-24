@@ -21,7 +21,8 @@ import type { App } from "obsidian";
 import type { LinkSuggestion } from "../../../src/suggest/item.ts";
 import { installFluentTitles } from "../../../src/suggest/patch.ts";
 
-const OPTIONS = { property: "fluent" };
+/** The patch reads its settings per call, so a test supplies them the same way the plugin does. */
+const options = () => ({ property: "fluent" });
 
 /** Stands in for the `TFile` on a suggestion. */
 const file: any = { basename: "Interiority", path: "Interiority.md" };
@@ -73,8 +74,8 @@ function appWith(suggests: unknown[], frontmatter: unknown = { fluent: true }): 
  * outlived its test would still be wrapping the next one's — and wrapping it *underneath*, so the
  * inner patch would quietly transform a suggestion the outer one had decided to leave alone.
  */
-function installFor(t: TestContext, app: App) {
-  const result = installFluentTitles(app, OPTIONS);
+function installFor(t: TestContext, app: App, provider = options) {
+  const result = installFluentTitles(app, provider);
 
   assert.equal(result.installed, true, "expected the fake registry to be patchable");
   t.after(() => {
@@ -186,6 +187,27 @@ test("a note that is not fluent reaches the composer exactly as it left the popu
   assert.equal(suggest.received[0]?.item, item);
 });
 
+test("the property is read on every completion, not captured at install", (t) => {
+  // Renaming the property in settings has to take effect on the next completion. The patch is
+  // installed once and left in place, so the only thing that can carry a rename across is reading
+  // the settings per call — a wrapper that closed over them would keep answering with the name the
+  // vault had when the plugin loaded.
+  const suggest = new LinkSuggest();
+  const settings = { property: "fluent" };
+  installFor(t, appWith([suggest]), () => settings);
+
+  suggest.context = contextFor("about the ");
+  suggest.selectSuggestion(fileItem(), {});
+  assert.equal((suggest.received[0]?.item as any).alias, "interiority", "the vault's property is fluent");
+
+  settings.property = "common-noun";
+  suggest.context = contextFor("about the ");
+  const item = fileItem();
+  suggest.selectSuggestion(item, {});
+
+  assert.equal(suggest.received[1]?.item, item, "the note no longer carries the property being looked for");
+});
+
 test("uninstalling puts the completer back", (t) => {
   const { suggest, result } = install(t);
   assert.equal(result.installed, true);
@@ -197,6 +219,26 @@ test("uninstalling puts the completer back", (t) => {
   suggest.selectSuggestion(item, {});
 
   assert.equal(suggest.received[0]?.item, item, "the wrapper should be gone, not merely inert");
+});
+
+test("installing again after an uninstall patches afresh", (t) => {
+  // The master toggle removes the patch and puts it back, so the completer is wrapped, unwrapped
+  // and wrapped again within one session. That is not the same code path as the first install:
+  // `selectSuggestion` is inherited rather than owned here, exactly as it is in the app, so
+  // uninstalling *deletes* the wrapper off the subclass instead of restoring a property — and the
+  // second install has to wrap what the prototype chain is offering by then.
+  const suggest = new LinkSuggest();
+  const app = appWith([suggest]);
+
+  const first = installFluentTitles(app, options);
+  assert.equal(first.installed, true);
+  if (first.installed) first.uninstall();
+
+  installFor(t, app);
+  suggest.context = contextFor("about the ");
+  suggest.selectSuggestion(fileItem(), {});
+
+  assert.equal((suggest.received[0]?.item as any).alias, "interiority", "the second install must adjust too");
 });
 
 test("a registry that does not look as expected is reported rather than thrown", () => {
@@ -212,7 +254,7 @@ test("a registry that does not look as expected is reported rather than thrown",
   ];
 
   for (const app of registries) {
-    const result = installFluentTitles(app as App, OPTIONS);
+    const result = installFluentTitles(app as App, options);
     assert.equal(result.installed, false, `expected no patch for ${JSON.stringify(app)}`);
     if (!result.installed) assert.match(result.reason, /\S/);
   }

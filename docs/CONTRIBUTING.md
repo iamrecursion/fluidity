@@ -31,17 +31,18 @@ shell, so `make check` works from a bare terminal too while being a little slowe
 
 `make help` lists every target, but the main ones you will use are these:
 
-| Target           | What it does                                                            |
-| ---------------- | ----------------------------------------------------------------------- |
-| `make build`     | typecheck + bundle — a release `main.js`                                |
-| `make dev`       | rebuild `main.js` on change, with sourcemaps                            |
-| `make install`   | build, then copy the plugin into `$DEV_VAULT_PATH`                      |
-| `make link`      | symlink this checkout's files into `$DEV_VAULT_PATH` instead of copying |
-| `make unlink`    | swap those symlinks back for a copied build                             |
-| `make check`     | **everything CI checks**: format, typecheck, lint, all tests            |
-| `make test-unit` | the pure tests only — fast                                              |
-| `make format`    | reformat Markdown, JSON, CSS and TypeScript with dprint                 |
-| `make clean`     | drop build output, keep `node_modules`                                  |
+| Target              | What it Does                                                            |
+| ------------------- | ----------------------------------------------------------------------- |
+| `make build`        | typecheck + bundle — a release `main.js`                                |
+| `make dev`          | rebuild `main.js` on change, with sourcemaps                            |
+| `make install`      | build, then copy the plugin into `$DEV_VAULT_PATH`                      |
+| `make link`         | symlink this checkout's files into `$DEV_VAULT_PATH` instead of copying |
+| `FORCE=1 make link` | the same, taking over an install or a link to another checkout          |
+| `make unlink`       | swap those symlinks back for a copied build                             |
+| `make check`        | **everything CI checks**: format, typecheck, lint, all tests            |
+| `make test-unit`    | the pure tests only — fast                                              |
+| `make format`       | reformat Markdown, JSON, CSS and TypeScript with dprint                 |
+| `make clean`        | drop build output, keep `node_modules`                                  |
 
 Building without Nix is possible as the toolchain is only Node, and `npm ci && npm run build` is
 exactly what Obsidian's plugin review runs, so CI checks that path on every push. You will want
@@ -80,11 +81,21 @@ make link
 
 It takes the same two guards as `make install` and deliberately does not build, since the intent is
 that you link once and leave `make dev` running — so a fresh checkout has no `main.js` yet, its link
-dangles, and the target says so rather than leaving you with a plugin Obsidian cannot load. It never
-removes what is already at the destination: if `make install` has put a copied folder there,
-`make link` tells you to delete it yourself, because that folder may hold your `data.json`. Settings
+dangles, and the target says so rather than leaving you with a plugin Obsidian cannot load. Settings
 Obsidian writes land in the vault folder beside the links. Reloading is still on you, as Obsidian
 does not watch the files for changes.
+
+By default it refuses a destination that is already occupied, because those files are somebody's.
+`FORCE=1 make link` takes one over, but will never:
+
+- **Remove the plugin directory.** A copied install loses the plugin's three files _by name_, which
+  this checkout rebuilds in a second. Anything else in the folder stays.
+- **Follow a symlink.** A whole-folder link is removed with no trailing slash, so the checkout on
+  the other end is untouched.
+- **Remove `data.json`.** It is the one thing in that folder nobody can regenerate, so it is left
+  where it lies.
+- **Operate on a unrecognized destination.** Force is permission to replace this plugin's files, not
+  a licence to guess at somebody else's.
 
 The plugin folder is a real directory and only its contents are links, which is what makes it safe
 to remove. `rm` deletes a symlink rather than following it, so clearing the folder out costs three
@@ -128,6 +139,20 @@ Any change to what gets inserted should be exercised against at least this much:
    link.
 8. **Disabling the plugin**, after which the completer must behave as stock without any intervention
    from the monkey patch.
+
+Any change to settings should be exercised against this much:
+
+1. The **status line**, which must read **Active** in green behind a checkmark on a working vault,
+   and **Inactive** in red behind a crossed octagon the moment the master toggle is turned off. A
+   missing icon means Obsidian's Lucide knows neither name `settings/tab` tries for it.
+2. The **master toggle off**, after which a fluent note completes exactly as it does with the plugin
+   disabled — and **on again**, after which it adjusts once more without a reload.
+3. A **renamed property**, which must take effect on the very next completion with no reload: the
+   note carrying the old property stops being adjusted, and one carrying the new one starts.
+4. **Clearing the property field**, which means `fluent` and shows it as a placeholder.
+5. **Reopening the tab**, and restarting Obsidian, after which both settings read back as they were
+   left.
+6. Searching Obsidian's own **settings search** for `fluent`, which must find both settings.
 
 ## Tests
 

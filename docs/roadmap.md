@@ -7,9 +7,10 @@ Nothing here is committed to or has a date; it is a statement of intent.
 
 - **Section-Aware Alias Links.** The second half of the plugin, described below. It is the reason
   Fluidity exists as much as fluent titles are.
-- **Real-Vault Coverage of the Settings Tab.** The settings path is exercised by type-checking and
-  the pure defaults test, not by anything that renders it. Every settings change needs a manual pass
-  until that is no longer true.
+- **Real-Vault Coverage of the Settings Tab.** The normalizer is unit-tested and the tab is
+  type-checked, but nothing renders it outside a vault — and nothing can, since the controls are
+  declarations handed to Obsidian to draw. Every settings change needs a manual pass, which the
+  [contributing guide](./CONTRIBUTING.md#what-to-check-by-hand) lists.
 - **Mobile.** The manifest says the plugin is not desktop-only, and nothing in the design should
   care — but the completer is reached differently on the mobile toolbar's `[[` button, and that has
   not been exercised. Until it has, "should work" is all that can honestly be claimed.
