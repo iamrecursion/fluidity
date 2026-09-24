@@ -1,11 +1,11 @@
 # Fluidity
 
 Fluidity is a plugin for [Obsidian](https://obsidian.md) that finishes the links the link completer
-starts while giving you control over exactly how itt's done!
+starts while giving you control over exactly how it's done!
 
 Obsidian's autocomplete is usually very good at working out _which note you meant_, and then hands
 you a link that is _nearly_ right. The display text might be capitalized when the sentence wanted it
-lowercase, or the linked pointing at the top of a note when you meant it to point at a section
+lowercase, or the link pointing at the top of a note when you meant it to point at a section
 half-way down. Both leave you editing a link that could have just been right the first time.
 
 Fluidity changes what gets inserted, at the moment it gets inserted, so there is nothing to go back

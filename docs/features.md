@@ -210,10 +210,6 @@ See the [roadmap](./roadmap.md).
 
 ## Settings
 
-**Not implemented yet.** There is no settings tab. The property is fixed as `fluent` in
-`src/main.ts`, there is no master toggle, and changing either takes an edit and a rebuild. What this
-section describes is the intended shape, and the [roadmap](./roadmap.md) tracks it.
-
 **Settings → Fluidity**.
 
 | Setting             | Default  | What it does                                                   |
@@ -221,15 +217,12 @@ section describes is the intended shape, and the [roadmap](./roadmap.md) tracks 
 | **Fluent titles**   | on       | The master toggle. Off, nothing about a completion is changed. |
 | **Fluent property** | `fluent` | Which frontmatter property marks a note fluent.                |
 
-Renaming the property takes effect immediately and does not migrate anything — notes still carrying
-the old property simply stop being treated as fluent. It exists for vaults where `fluent` already
-means something else.
+Turning **fluent titles** off does not leave a patched completer sitting idle but instead removes
+the patch outright, so that off means Obsidian is running the code it would run without Fluidity
+installed.
 
-Above these sits a **read-only status line** reporting whether the completer patch installed. It is
-the first thing to check when nothing seems to be happening: Fluidity works by patching a part of
-Obsidian that is not public API, and an Obsidian update is capable of moving what it attaches to. If
-that happens the plugin declines to install the patch, says so here and once in the developer
-console, and leaves the completer behaving exactly as it does without the plugin.
-
-Until that line exists, the developer console is the only place the failure is reported, which is
-why checking the plugin by hand starts by opening it.
+Renaming the **property** takes effect on the next completion and does not migrate anything; notes
+still carrying the old property simply stop being treated as fluent. It exists for vaults where
+`fluent` already means something else. Leaving the field empty means `fluent`, which is what the
+greyed-out placeholder is telling you; surrounding spaces are dropped, because a trailing one is
+invisible in both this field and the property editor and would read as the plugin being broken.
